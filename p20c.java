@@ -1,101 +1,106 @@
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.util.Arrays;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Map;
+import java.util.Map.Entry;
 import java.util.PriorityQueue;
 import java.util.Queue;
-import java.util.Set;
 import java.util.StringTokenizer;
 
 public class p20c {
-	public static void main(String... arg) throws IOException {
+	public static void main(String[] s) throws IOException {
 		BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
 		// BufferedReader br = new BufferedReader(new FileReader("input.txt"));
 		StringTokenizer st = new StringTokenizer(br.readLine());
-		int vertices = Integer.parseInt(st.nextToken()), edges = Integer.parseInt(st.nextToken());
-		Map<Integer, HashMap<Integer, Integer>> nodes = new HashMap<>();
+		int vertices = Integer.parseInt(st.nextToken());
+		int edges = Integer.parseInt(st.nextToken());
+		Node[] nodes = new Node[vertices + 1];
+
 		for (int i = 0; i < edges; i++) {
 			st = new StringTokenizer(br.readLine());
-			int n1 = Integer.parseInt(st.nextToken()) - 1, n2 = Integer.parseInt(st.nextToken()) - 1,
-					weight = Integer.parseInt(st.nextToken());
-			HashMap<Integer, Integer> node1 = nodes.get(n1);
-			if (node1 == null)
-				node1 = new HashMap<Integer, Integer>();
-			node1.put(n2, weight);
-			nodes.put(n1, node1);
-			HashMap<Integer, Integer> node2 = nodes.get(n2);
-			if (node2 == null)
-				node2 = new HashMap<Integer, Integer>();
-			node2.put(n1, weight);
-			nodes.put(n2, node2);
+			int n1 = Integer.parseInt(st.nextToken());
+			int n2 = Integer.parseInt(st.nextToken());
+			int weight = Integer.parseInt(st.nextToken());
 
+			nodes = p20c.addNode(n1, n2, weight, nodes);
+			nodes = p20c.addNode(n2, n1, weight, nodes);
 		}
-		dijkstra(0, vertices - 1, vertices, nodes);
+
+		p20c.dijkstra(1, vertices, nodes);
 	}
 
-	private static void dijkstra(int a, int b, int vertices, Map<Integer, HashMap<Integer, Integer>> nodes) {
-		Set<Integer> visited = new HashSet<>();
-		int[] dist = new int[vertices];
-		Arrays.fill(dist, Integer.MAX_VALUE);
-		dist[a] = 0;
-		int[] parent = new int[vertices];
-		parent[0] = -1;
+	private static Node[] addNode(int n1, int n2, int weight, Node[] nodes) {
+		if (nodes[n1] == null)
+			nodes[n1] = new Node(n1);
+		nodes[n1].addNeighbor(n2, weight);
+		return nodes;
+	}
 
-		Queue<Node> pq = new PriorityQueue<>(new Node());
-		pq.add(new Node(a, dist[a]));
-		while (!pq.isEmpty()) {
-			Node n = pq.remove();
-			if (n.node == b) {
-				printPath(parent, b);
-				return;
-			}
-			if (visited.contains(n))
+	public static void dijkstra(int start, int goal, Node[] nodes) {
+		if (nodes[start] == null) {
+			System.out.println("-1");
+			return;
+		}
+
+		// this is the only thing that made the memory overflow, allocating boolean
+		// flags for each visited used way too much space, since only a meager amount of
+		// nodes will actually be looked at to find the path, creating a set to
+		// represent which nodes have been visited takes less space
+		HashSet<Integer> visited = new HashSet<>();
+		Queue<Node> pq = new PriorityQueue<>((n1, n2) -> n1.cost - n2.cost);
+		Node n = nodes[start];
+		n.cost = 0;
+		pq.add(n);
+		while (!pq.isEmpty() && n.node != goal) {
+			n = pq.remove();
+			if (visited.contains(n.node))
 				continue;
 			visited.add(n.node);
-			if (nodes.get(n.node) == null)
-				continue;
-			for (Integer nbr : nodes.get(n.node).keySet()) {
-				if (!visited.contains(nbr)) {
-					int newDist = dist[n.node] + nodes.get(n.node).get(nbr);
-					if (newDist < dist[nbr]) {
-						parent[nbr] = n.node;
-						dist[nbr] = newDist;
-					}
-					pq.add(new Node(nbr, dist[nbr]));
+			for (Entry<Integer, Integer> path : n.edges.entrySet()) {
+				Node nbr = nodes[path.getKey()];
+				if (!visited.contains(nbr.node)) {
+					nbr.addParent(n, n.cost + path.getValue());
+					pq.add(nbr);
 				}
 			}
 		}
-		System.out.println(-1);
+
+		System.out.println(n.node == goal ? n.getPath() : "-1");
 	}
 
-	static void printPath(int parent[], int j) {
-		if (j != 0)
-			printPath(parent, parent[j]);
-		System.out.print(j + 1 + " ");
-	}
-}
+	private static class Node {
+		int node, cost;
+		HashMap<Integer, Integer> edges;
+		Node parent;
 
-class Node implements Comparator<Node> {
-	int node, cost;
+		public Node(int node) {
+			this.node = node;
+			this.cost = Integer.MAX_VALUE;
+			this.edges = new HashMap<>();
+		}
 
-	public Node() {
-	}
+		public void addNeighbor(int nbr, int weight) {
+			Integer prevWeight = this.edges.get(nbr);
+			if (prevWeight == null || prevWeight != null && weight < prevWeight)
+				this.edges.put(nbr, weight);
+		}
 
-	public Node(int node, int cost) {
-		this.node = node;
-		this.cost = cost;
-	}
+		public void addParent(Node parent, int newCost) {
+			if (newCost < this.cost) {
+				this.parent = parent;
+				this.cost = newCost;
+			}
+		}
 
-	@Override
-	public int compare(Node node1, Node node2) {
-		if (node1.cost < node2.cost)
-			return -1;
-		if (node1.cost > node2.cost)
-			return 1;
-		return 0;
+		public StringBuilder builderPath() {
+			if (this.node > 1)
+				return this.parent.builderPath().append(" " + this.node);
+			return new StringBuilder("1");
+		}
+
+		public String getPath() {
+			return this.builderPath().toString();
+		}
 	}
 }
