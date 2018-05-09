@@ -39,8 +39,6 @@ int edmondsKarp(int N, int** cap, int** endFlow, int source, int sink){
     int flow = 0;
     int maxFlow[N];
     int previous[N];
-    std::memset(maxFlow,-1,sizeof(maxFlow));
-    std::memset(previous,-1,sizeof(previous));
 
     while(bfs(N, cap, source, sink, previous, maxFlow)){
         int currentFlow = maxFlow[sink];
